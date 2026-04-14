@@ -28,8 +28,10 @@ fi
 echo "✅ Latest version found: $VERSION"
 
 echo "⬇️  Downloading and decrypting firmware to workspace/ (Multi-threaded)..."
-# samloader-rs handles multi-threaded download AND on-the-fly decryption automatically!
-samloader -m "$MODEL" -r "$REGION" download -v "$VERSION" -O "$WORKSPACE"
+# We move INTO the workspace, download automatically, and move back out. No flags needed!
+cd "$WORKSPACE"
+samloader -m "$MODEL" -r "$REGION" download
+cd "$ROOT_DIR"
 
 echo "📦 Locating downloaded ZIP file..."
 shopt -s nullglob
