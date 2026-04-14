@@ -1,0 +1,20 @@
+# One package/folder name per line (match directory names inside app/priv-app).
+# Keep this list conservative; remove/adjust for your target userbase.
+
+ARZone
+ARCore
+Facebook
+MetaAppManager
+MetaServices
+SamsungFree
+SamsungGlobalGoals
+SamsungMembers
+SmartThings
+SmartThingsStub
+OneDrive_Samsung_v3
+MicrosoftOneDrive
+LinkedIn
+Netflix_stub
+Netflix
+Spotify
+Upday
