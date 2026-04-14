@@ -28,8 +28,9 @@ jobs:
 
       - name: Run build
         run: |
-          chmod +x ./build_catalyst.sh
-          sudo ./build_catalyst.sh
+          chmod -R +x scripts/
+          chmod +x build_catalyst.sh
+          ./build_catalyst.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
