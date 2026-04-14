@@ -11,8 +11,10 @@ EXTRACTED="$WORKSPACE/fw_extracted"
 mkdir -p "$WORKSPACE"
 
 echo "🐍 Installing samloader..."
-python3 -m pip install --upgrade pip >/dev/null 2>&1 || true
-python3 -m pip install "git+https://github.com/nlscc/samloader.git"
+# Using --break-system-packages to bypass Ubuntu 24.04 pip restrictions
+python3 -m pip install --upgrade pip --break-system-packages >/dev/null 2>&1 || true
+# Using the L-S-D fork to prevent the nonce IndexError
+python3 -m pip install --break-system-packages "git+https://github.com/L-S-D/samloader.git"
 
 MODEL="SM-A146B"
 REGION="INS"
