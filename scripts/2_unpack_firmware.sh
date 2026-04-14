@@ -94,12 +94,19 @@ else
   exit 1
 fi
 
-echo "🧩 Unpacking super image (lpunpack)..."
+echo "🧩 Unpacking super image (Python lpunpack)..."
 mkdir -p "$WORKSPACE/lp"
-if [[ -x "$ROOT_DIR/tools/lpunpack" ]]; then
-  "$ROOT_DIR/tools/lpunpack" "$SUPER_RAW" "$WORKSPACE/lp"
+
+echo "🐍 Downloading pure Python lpunpack to bypass binary file limits..."
+wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack.py" -O "$ROOT_DIR/tools/lpunpack.py"
+
+echo "Attempting to unpack..."
+if python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_RAW" "$WORKSPACE/lp"; then
+  echo "✅ Successfully unpacked from raw image."
+elif python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_RAW_SPARSE" "$WORKSPACE/lp"; then
+  echo "✅ Successfully unpacked directly from sparse image."
 else
-  echo "⚠️  tools/lpunpack not present or not executable; cannot unpack super image."
+  echo "❌ ERROR: Failed to unpack super image!"
   exit 1
 fi
 
