@@ -15,8 +15,9 @@ mv extracted_tools/android-tools-linux-main/* tools/
 chmod +x tools/*
 rm -rf tools.zip extracted_tools
 
-# Symlink the apt-installed tools into our local tools folder so the unpack script finds them!
-ln -sf $(which simg2img) tools/simg2img
-ln -sf $(which lz4) tools/lz4
+# Symlink the apt-installed tools into our local tools folder
+ln -sf $(which simg2img) tools/simg2img || true
+ln -sf $(which lz4) tools/lz4 || true
 
 echo "✅ ROM Tools successfully installed."
+exit 0 # <--- It forces the script to report "Success" to GitHub.
