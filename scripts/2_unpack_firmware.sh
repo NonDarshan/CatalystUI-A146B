@@ -103,29 +103,44 @@ else
   exit 1
 fi
 
-SYSTEM_IMG="$WORKSPACE/lp/system.img"
-VENDOR_IMG="$WORKSPACE/lp/vendor.img"
-PRODUCT_IMG="$WORKSPACE/lp/product.img"
-ODM_IMG="$WORKSPACE/lp/odm.img"
+echo "📊 Unpacked partitions found:"
+ls -la "$WORKSPACE/lp" || true
+
+echo "🧪 Checking for fsck.erofs tool..."
+ls -la "$ROOT_DIR/tools/fsck.erofs" || true
 
 echo "🧪 Extracting EROFS partitions to mnt/ (fsck.erofs --extract)..."
 mkdir -p "$ROOT_DIR/mnt/system" "$ROOT_DIR/mnt/vendor" "$ROOT_DIR/mnt/product" "$ROOT_DIR/mnt/odm"
 
 extract_erofs() {
-  local img="$1"
+  local part_name="$1"
   local outdir="$2"
-  if [[ -f "$img" && -x "$ROOT_DIR/tools/fsck.erofs" ]]; then
-    echo "📂 Extracting $(basename "$img") -> $outdir"
-    "$ROOT_DIR/tools/fsck.erofs" --extract="$outdir" "$img"
+  
+  # Smart detection: Try standard name, then fallback to Virtual A/B (_a) name
+  local img="$WORKSPACE/lp/${part_name}.img"
+  if [[ ! -f "$img" ]]; then
+    img="$WORKSPACE/lp/${part_name}_a.img"
+  fi
+
+  if [[ -f "$img" ]]; then
+    if [[ -x "$ROOT_DIR/tools/fsck.erofs" ]]; then
+      echo "📂 Extracting $(basename "$img") -> $outdir"
+      "$ROOT_DIR/tools/fsck.erofs" --extract="$outdir" "$img"
+    else
+      echo "❌ ERROR: tools/fsck.erofs is missing or not executable!"
+      exit 1
+    fi
   else
-    echo "❌ Missing $(basename "$img") or tools/fsck.erofs; cannot extract."
-    exit 1
+    echo "⚠️  WARNING: Could not find ${part_name}.img or ${part_name}_a.img. Skipping."
   fi
 }
 
-extract_erofs "$SYSTEM_IMG" "$ROOT_DIR/mnt/system"
-extract_erofs "$VENDOR_IMG" "$ROOT_DIR/mnt/vendor"
-extract_erofs "$PRODUCT_IMG" "$ROOT_DIR/mnt/product"
-extract_erofs "$ODM_IMG" "$ROOT_DIR/mnt/odm"
+extract_erofs "system" "$ROOT_DIR/mnt/system"
+extract_erofs "vendor" "$ROOT_DIR/mnt/vendor"
+extract_erofs "product" "$ROOT_DIR/mnt/product"
+extract_erofs "odm" "$ROOT_DIR/mnt/odm"
+# Note: system_ext is sometimes used by Samsung, adding it just in case!
+mkdir -p "$ROOT_DIR/mnt/system_ext"
+extract_erofs "system_ext" "$ROOT_DIR/mnt/system_ext"
 
 echo "✅ Firmware unpack stage completed."
