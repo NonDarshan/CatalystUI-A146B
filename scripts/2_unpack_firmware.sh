@@ -10,45 +10,38 @@ WORKSPACE="$ROOT_DIR/workspace"
 EXTRACTED="$WORKSPACE/fw_extracted"
 mkdir -p "$WORKSPACE"
 
-echo "🐍 Installing samloader..."
-# Using --break-system-packages to bypass Ubuntu 24.04 pip restrictions
-python3 -m pip install --upgrade pip --break-system-packages >/dev/null 2>&1 || true
-# Using the L-S-D fork to prevent the nonce IndexError
-python3 -m pip install --break-system-packages "git+https://github.com/L-S-D/samloader.git"
+echo "🦀 Installing modern Samloader-RS (by Topjohnwu)..."
+# GitHub Actions Ubuntu has Rust pre-installed. Compiling takes ~1 min.
+cargo install --git https://github.com/topjohnwu/samloader-rs.git
+export PATH="$HOME/.cargo/bin:$PATH"
 
 MODEL="SM-A146B"
 REGION="INS"
 
+# Note: The command in Rust is "check" instead of "checkupdate"
 echo "🔎 Checking latest firmware for MODEL=$MODEL REGION=$REGION ..."
-VERSION="$(samloader -m "$MODEL" -r "$REGION" checkupdate | tr -d '\r' | tail -n 1)"
+VERSION="$(samloader -m "$MODEL" -r "$REGION" check | tr -d '\r' | tail -n 1)"
 if [[ -z "$VERSION" ]]; then
   echo "❌ Failed to fetch firmware version from FOTA."
   exit 1
 fi
 echo "✅ Latest version found: $VERSION"
 
-echo "⬇️  Downloading encrypted firmware to workspace/ ..."
+echo "⬇️  Downloading and decrypting firmware to workspace/ (Multi-threaded)..."
+# samloader-rs handles multi-threaded download AND on-the-fly decryption automatically!
 samloader -m "$MODEL" -r "$REGION" download -v "$VERSION" -O "$WORKSPACE"
 
+echo "📦 Locating downloaded ZIP file..."
 shopt -s nullglob
-enc_files=("$WORKSPACE"/*.enc4)
+zip_files=("$WORKSPACE"/*.zip)
 shopt -u nullglob
-if [[ ${#enc_files[@]} -lt 1 ]]; then
-  echo "❌ No .enc4 firmware file found in workspace/ after download."
+if [[ ${#zip_files[@]} -lt 1 ]]; then
+  echo "❌ No .zip firmware file found in workspace/ after download."
   ls -la "$WORKSPACE" || true
   exit 1
 fi
-ENC4_FILE="${enc_files[0]}"
-echo "🔐 Encrypted package: $(basename "$ENC4_FILE")"
-
-FIRMWARE_ZIP="$WORKSPACE/firmware.zip"
-echo "🔓 Decrypting firmware to: $FIRMWARE_ZIP"
-if samloader -m "$MODEL" -r "$REGION" decrypt -v "$VERSION" -i "$ENC4_FILE" -o "$FIRMWARE_ZIP"; then
-  :
-else
-  echo "⚠️  decrypt subcommand failed; attempting legacy decrypt4 syntax..."
-  samloader decrypt4 "$VERSION" "$MODEL" "$REGION" "$ENC4_FILE" "$FIRMWARE_ZIP"
-fi
+FIRMWARE_ZIP="${zip_files[0]}"
+echo "✅ Firmware package: $(basename "$FIRMWARE_ZIP")"
 
 echo "📦 Extracting firmware package..."
 rm -rf "$EXTRACTED"
