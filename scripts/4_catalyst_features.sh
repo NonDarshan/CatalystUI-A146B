@@ -31,7 +31,7 @@ if [[ ! -f "$FLOATING" ]]; then
 EOF
 fi
 
-echo "🧬 Enabling flagship floating features..."
+echo "🧬 Enabling flagship floating features (3D Blur, Edge Lighting)..."
 sedi 's#<SEC_FLOATING_FEATURE_GRAPHICS_SUPPORT_3D_BG>FALSE#<SEC_FLOATING_FEATURE_GRAPHICS_SUPPORT_3D_BG>TRUE#g' "$FLOATING"
 sedi 's#<SEC_FLOATING_FEATURE_SYSTEMUI_CONFIG_EDGELIGHTING>FALSE#<SEC_FLOATING_FEATURE_SYSTEMUI_CONFIG_EDGELIGHTING>TRUE#g' "$FLOATING"
 
@@ -54,14 +54,21 @@ if [[ ! -f "$CSC" ]]; then
 EOF
 fi
 
-echo "📲 Appending CSC premium features (call recording, camera toggles, 5G Force)..."
+echo "📲 Appending Ultimate CSC premium features (5G, App Lock, Network Speed, etc)..."
 cat >> "$CSC" <<'EOF'
 
 <CscFeature_VoiceCall_ConfigRecording>RecordingAllowed</CscFeature_VoiceCall_ConfigRecording>
-<CscFeature_Camera_ShutterSoundMenu>TRUE</CscFeature_Camera_ShutterSoundMenu>
-<CscFeature_Message_EnableSaveRestore>TRUE</CscFeature_Message_EnableSaveRestore>
 <CscFeature_Setting_SupportReal5G>TRUE</CscFeature_Setting_SupportReal5G>
 <CscFeature_RIL_ConfigNetworkMode>5G_ONLY</CscFeature_RIL_ConfigNetworkMode>
+<CscFeature_Setting_SupportRealTimeNetworkSpeed>TRUE</CscFeature_Setting_SupportRealTimeNetworkSpeed>
+
+<CscFeature_Camera_ShutterSoundMenu>TRUE</CscFeature_Camera_ShutterSoundMenu>
+<CscFeature_Audio_ConfigActionEnableHearingDamage>FALSE</CscFeature_Audio_ConfigActionEnableHearingDamage>
+
+<CscFeature_Message_EnableSaveRestore>TRUE</CscFeature_Message_EnableSaveRestore>
+<CscFeature_AppLock_ConfigAppLock>TRUE</CscFeature_AppLock_ConfigAppLock>
+<CscFeature_SmartManager_ConfigDashboard>applock</CscFeature_SmartManager_ConfigDashboard>
+<CscFeature_Setting_SupportMultiUser>TRUE</CscFeature_Setting_SupportMultiUser>
 EOF
 
-echo "✅ Catalyst feature injection completed."
+echo "✅ Catalyst ultimate feature injection completed."
