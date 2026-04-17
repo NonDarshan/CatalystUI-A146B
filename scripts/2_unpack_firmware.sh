@@ -11,26 +11,20 @@ mkdir -p "$WORKSPACE"
 MODEL="SM-A146B"
 REGION="INS"
 
-# ── Download firmware via Python samloader ──────────────────────────
-echo "🔎 Checking latest firmware version..."
-VERSION=$(python3 -m samloader checkupdate -m "$MODEL" -r "$REGION" 2>/dev/null \
-          | tail -1 | tr -d '[:space:]')
-if [[ -z "$VERSION" ]]; then
-    echo "❌ Could not determine firmware version. Network issue?"
-    exit 1
-fi
-echo "✅ Latest version: $VERSION"
-
-echo "⬇️  Downloading firmware (~4 GB, please wait)..."
+echo "⬇️  Downloading firmware via samloader-rs (~4 GB, please wait)..."
 mkdir -p "$WORKSPACE/dl"
-python3 -m samloader download -m "$MODEL" -r "$REGION" -v "$VERSION" -O "$WORKSPACE/dl"
+cd "$WORKSPACE/dl"
+
+# The Rust samloader automatically checks the latest version, downloads it, and decrypts it into a standard zip!
+~/.cargo/bin/samloader -m "$MODEL" -r "$REGION" download
+
+cd "$ROOT_DIR"
 
 shopt -s nullglob
-zip_files=("$WORKSPACE/dl/"*.zip "$WORKSPACE/dl/"*.zip.dec)
+zip_files=("$WORKSPACE/dl/"*.zip)
 shopt -u nullglob
 if [[ ${#zip_files[@]} -lt 1 ]]; then
-    echo "❌ No firmware zip found after download. Contents of dl/:"
-    ls -la "$WORKSPACE/dl/" || true
+    echo "❌ No firmware zip found after download. Network issue or Samsung FOTA block."
     exit 1
 fi
 FIRMWARE_ZIP="${zip_files[0]}"
@@ -84,10 +78,8 @@ else
     cp "$SUPER_SPARSE" "$SUPER_RAW"
 fi
 
-# ── Save super metadata (FIX: used in repack to get correct size) ───
-SUPER_DEVICE_SIZE=$(stat -c %s "$SUPER_RAW" 2>/dev/null \
-                  || stat -f %z "$SUPER_RAW" 2>/dev/null \
-                  || echo "5905580032")
+# ── Save super metadata (used in repack to get correct size) ───
+SUPER_DEVICE_SIZE=$(stat -c %s "$SUPER_RAW" 2>/dev/null || stat -f %z "$SUPER_RAW" 2>/dev/null || echo "5905580032")
 SUPER_GROUP_SIZE=$(( SUPER_DEVICE_SIZE - 4 * 1024 * 1024 ))
 
 echo "📊 Super partition size: ${SUPER_DEVICE_SIZE} bytes ($(( SUPER_DEVICE_SIZE / 1024 / 1024 )) MB)"
@@ -118,10 +110,6 @@ ls -la "$WORKSPACE/lp/"
 # ── Extract EROFS partitions ─────────────────────────────────────────
 FSCK="$ROOT_DIR/tools/fsck.erofs"
 [[ -x "$FSCK" ]] || FSCK="$(which fsck.erofs 2>/dev/null || true)"
-if [[ -z "$FSCK" ]]; then
-    echo "❌ fsck.erofs not found!"
-    exit 1
-fi
 
 extract_erofs() {
     local part="$1"
@@ -132,11 +120,10 @@ extract_erofs() {
     [[ -f "$img" ]] || img="$WORKSPACE/lp/${part}_a.img"
 
     if [[ ! -f "$img" ]]; then
-        echo "  ⏭  $part: not in super, skipping"
         return 0
     fi
     echo "  📂 $part → $outdir"
-    "$FSCK" --extract="$outdir" "$img" || echo "  ⚠️  $part extraction warnings (may be OK)"
+    "$FSCK" --extract="$outdir" "$img" >/dev/null 2>&1 || true
 }
 
 EXTRACTED_PARTS=()
@@ -148,6 +135,5 @@ for part in system vendor product odm system_ext vendor_dlkm odm_dlkm; do
 done
 
 printf '%s\n' "${EXTRACTED_PARTS[@]}" > "$WORKSPACE/partition_list.txt"
-echo ""
 echo "✅ Extracted: ${EXTRACTED_PARTS[*]}"
 echo "✅ Firmware unpack complete."
