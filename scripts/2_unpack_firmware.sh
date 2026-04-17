@@ -1,153 +1,153 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-echo "📡 Fetching latest firmware directly from Samsung FOTA..."
-
+echo "📡 [2/5] Fetching and unpacking firmware..."
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 WORKSPACE="$ROOT_DIR/workspace"
-EXTRACTED="$WORKSPACE/fw_extracted"
 mkdir -p "$WORKSPACE"
-
-echo "🦀 Installing modern Samloader-RS (by Topjohnwu)..."
-# GitHub Actions Ubuntu has Rust pre-installed. Compiling takes ~1 min.
-cargo install --git https://github.com/topjohnwu/samloader-rs.git
-export PATH="$HOME/.cargo/bin:$PATH"
 
 MODEL="SM-A146B"
 REGION="INS"
 
-# Note: The command in Rust is "check" instead of "checkupdate"
-echo "🔎 Checking latest firmware for MODEL=$MODEL REGION=$REGION ..."
-VERSION="$(samloader -m "$MODEL" -r "$REGION" check | tr -d '\r' | tail -n 1)"
+# ── Download firmware via Python samloader ──────────────────────────
+echo "🔎 Checking latest firmware version..."
+VERSION=$(python3 -m samloader checkupdate -m "$MODEL" -r "$REGION" 2>/dev/null \
+          | tail -1 | tr -d '[:space:]')
 if [[ -z "$VERSION" ]]; then
-  echo "❌ Failed to fetch firmware version from FOTA."
-  exit 1
+    echo "❌ Could not determine firmware version. Network issue?"
+    exit 1
 fi
-echo "✅ Latest version found: $VERSION"
+echo "✅ Latest version: $VERSION"
 
-echo "⬇️  Downloading and decrypting firmware to workspace/ (Multi-threaded)..."
-# We move INTO the workspace, download automatically, and move back out. No flags needed!
-cd "$WORKSPACE"
-samloader -m "$MODEL" -r "$REGION" download
-cd "$ROOT_DIR"
+echo "⬇️  Downloading firmware (~4 GB, please wait)..."
+mkdir -p "$WORKSPACE/dl"
+python3 -m samloader download -m "$MODEL" -r "$REGION" -v "$VERSION" -O "$WORKSPACE/dl"
 
-echo "📦 Locating downloaded ZIP file..."
 shopt -s nullglob
-zip_files=("$WORKSPACE"/*.zip)
+zip_files=("$WORKSPACE/dl/"*.zip "$WORKSPACE/dl/"*.zip.dec)
 shopt -u nullglob
 if [[ ${#zip_files[@]} -lt 1 ]]; then
-  echo "❌ No .zip firmware file found in workspace/ after download."
-  ls -la "$WORKSPACE" || true
-  exit 1
+    echo "❌ No firmware zip found after download. Contents of dl/:"
+    ls -la "$WORKSPACE/dl/" || true
+    exit 1
 fi
 FIRMWARE_ZIP="${zip_files[0]}"
-echo "✅ Firmware package: $(basename "$FIRMWARE_ZIP")"
+echo "✅ Found: $(basename "$FIRMWARE_ZIP")"
 
+# ── Extract AP tar ───────────────────────────────────────────────────
+EXTRACTED="$WORKSPACE/fw_extracted"
+rm -rf "$EXTRACTED"; mkdir -p "$EXTRACTED"
 echo "📦 Extracting firmware package..."
-rm -rf "$EXTRACTED"
-mkdir -p "$EXTRACTED"
 unzip -q "$FIRMWARE_ZIP" -d "$EXTRACTED"
 
 shopt -s nullglob
-ap_files=("$EXTRACTED"/AP_*.tar.md5)
+ap_files=("$EXTRACTED"/AP_*.tar.md5 "$EXTRACTED"/AP_*.tar)
 shopt -u nullglob
 if [[ ${#ap_files[@]} -lt 1 ]]; then
-  echo "❌ AP_*.tar.md5 not found in extracted firmware."
-  ls -la "$EXTRACTED" || true
-  exit 1
+    echo "❌ AP_*.tar.md5 not found. Contents of extracted firmware:"
+    ls -la "$EXTRACTED"
+    exit 1
 fi
 AP_TAR="${ap_files[0]}"
 echo "✅ AP file: $(basename "$AP_TAR")"
 
-echo "🔨 Extracting super.img.lz4 from the AP file..."
-tar -xf "$AP_TAR" -C "$WORKSPACE" "super.img.lz4"
-
-echo "🧹 Cleaning up large temporary files..."
-rm -f "$FIRMWARE_ZIP" || true
-rm -rf "$EXTRACTED" || true
-
-SUPER_LZ4="$WORKSPACE/super.img.lz4"
-SUPER_RAW_SPARSE="$WORKSPACE/super.img"
-SUPER_RAW="$WORKSPACE/super_raw.img"
-
-if [[ ! -f "$SUPER_LZ4" ]]; then
-  echo "❌ super.img.lz4 not found in workspace/ after AP extraction."
-  ls -la "$WORKSPACE" || true
-  exit 1
-fi
-
-echo "🗜️  Decompressing LZ4..."
-if [[ -x "$ROOT_DIR/tools/lz4" ]]; then
-  "$ROOT_DIR/tools/lz4" -d "$SUPER_LZ4" "$SUPER_RAW_SPARSE"
-else
-  echo "⚠️  tools/lz4 not present or not executable; cannot decompress."
-  exit 1
-fi
-
-echo "🧱 Converting sparse to raw (simg2img)..."
-if [[ -x "$ROOT_DIR/tools/simg2img" ]]; then
-  "$ROOT_DIR/tools/simg2img" "$SUPER_RAW_SPARSE" "$SUPER_RAW"
-else
-  echo "⚠️  tools/simg2img not present or not executable; cannot convert sparse image."
-  exit 1
-fi
-
-echo "🧩 Unpacking super image (Python lpunpack)..."
-mkdir -p "$WORKSPACE/lp"
-
-echo "🐍 Downloading pure Python lpunpack to bypass binary file limits..."
-wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack.py" -O "$ROOT_DIR/tools/lpunpack.py"
-
-echo "Attempting to unpack..."
-if python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_RAW" "$WORKSPACE/lp"; then
-  echo "✅ Successfully unpacked from raw image."
-elif python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_RAW_SPARSE" "$WORKSPACE/lp"; then
-  echo "✅ Successfully unpacked directly from sparse image."
-else
-  echo "❌ ERROR: Failed to unpack super image!"
-  exit 1
-fi
-
-echo "📊 Unpacked partitions found:"
-ls -la "$WORKSPACE/lp" || true
-
-echo "🧪 Checking for fsck.erofs tool..."
-ls -la "$ROOT_DIR/tools/fsck.erofs" || true
-
-echo "🧪 Extracting EROFS partitions to mnt/ (fsck.erofs --extract)..."
-mkdir -p "$ROOT_DIR/mnt/system" "$ROOT_DIR/mnt/vendor" "$ROOT_DIR/mnt/product" "$ROOT_DIR/mnt/odm"
-
-extract_erofs() {
-  local part_name="$1"
-  local outdir="$2"
-  
-  # Smart detection: Try standard name, then fallback to Virtual A/B (_a) name
-  local img="$WORKSPACE/lp/${part_name}.img"
-  if [[ ! -f "$img" ]]; then
-    img="$WORKSPACE/lp/${part_name}_a.img"
-  fi
-
-  if [[ -f "$img" ]]; then
-    if [[ -x "$ROOT_DIR/tools/fsck.erofs" ]]; then
-      echo "📂 Extracting $(basename "$img") -> $outdir"
-      "$ROOT_DIR/tools/fsck.erofs" --extract="$outdir" "$img"
-    else
-      echo "❌ ERROR: tools/fsck.erofs is missing or not executable!"
-      exit 1
-    fi
-  else
-    echo "⚠️  WARNING: Could not find ${part_name}.img or ${part_name}_a.img. Skipping."
-  fi
+echo "🔨 Extracting super.img.lz4 from AP tar..."
+tar -xf "$AP_TAR" -C "$WORKSPACE" super.img.lz4 || {
+    echo "❌ super.img.lz4 not in AP tar. Listing contents:"
+    tar -tf "$AP_TAR" | head -30
+    exit 1
 }
 
-extract_erofs "system" "$ROOT_DIR/mnt/system"
-extract_erofs "vendor" "$ROOT_DIR/mnt/vendor"
-extract_erofs "product" "$ROOT_DIR/mnt/product"
-extract_erofs "odm" "$ROOT_DIR/mnt/odm"
-# Note: system_ext is sometimes used by Samsung, adding it just in case!
-mkdir -p "$ROOT_DIR/mnt/system_ext"
-extract_erofs "system_ext" "$ROOT_DIR/mnt/system_ext"
+echo "🧹 Freeing space (removing raw firmware download)..."
+rm -f "$FIRMWARE_ZIP" || true
+rm -rf "$EXTRACTED"   || true
 
-echo "✅ Firmware unpack stage completed."
+# ── Decompress LZ4 ─────────────────────────────────────────────────
+SUPER_LZ4="$WORKSPACE/super.img.lz4"
+SUPER_SPARSE="$WORKSPACE/super.img"
+SUPER_RAW="$WORKSPACE/super_raw.img"
+
+echo "🗜️  Decompressing super.img.lz4 → super.img..."
+lz4 -d -f "$SUPER_LZ4" "$SUPER_SPARSE"
+rm -f "$SUPER_LZ4"
+
+# ── Sparse → raw ────────────────────────────────────────────────────
+echo "🧱 Converting sparse → raw (if needed)..."
+SPARSE_MAGIC=$(xxd -l 4 -p "$SUPER_SPARSE" 2>/dev/null || echo "")
+if [[ "${SPARSE_MAGIC,,}" == "3aff26ed" ]]; then
+    echo "  → Sparse format detected, converting with simg2img..."
+    simg2img "$SUPER_SPARSE" "$SUPER_RAW"
+else
+    echo "  → Already raw, copying..."
+    cp "$SUPER_SPARSE" "$SUPER_RAW"
+fi
+
+# ── Save super metadata (FIX: used in repack to get correct size) ───
+SUPER_DEVICE_SIZE=$(stat -c %s "$SUPER_RAW" 2>/dev/null \
+                  || stat -f %z "$SUPER_RAW" 2>/dev/null \
+                  || echo "5905580032")
+SUPER_GROUP_SIZE=$(( SUPER_DEVICE_SIZE - 4 * 1024 * 1024 ))
+
+echo "📊 Super partition size: ${SUPER_DEVICE_SIZE} bytes ($(( SUPER_DEVICE_SIZE / 1024 / 1024 )) MB)"
+{
+    echo "SUPER_DEVICE_SIZE=$SUPER_DEVICE_SIZE"
+    echo "SUPER_GROUP_SIZE=$SUPER_GROUP_SIZE"
+} > "$WORKSPACE/super_metadata.env"
+
+# ── Unpack super image ───────────────────────────────────────────────
+echo "🧩 Unpacking super image with lpunpack..."
+mkdir -p "$WORKSPACE/lp"
+
+if [[ -x "$ROOT_DIR/tools/lpunpack" ]]; then
+    "$ROOT_DIR/tools/lpunpack" "$SUPER_RAW" "$WORKSPACE/lp" \
+        || python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_RAW" "$WORKSPACE/lp"
+elif [[ -f "$ROOT_DIR/tools/lpunpack.py" ]]; then
+    python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_RAW" "$WORKSPACE/lp" \
+        || python3 "$ROOT_DIR/tools/lpunpack.py" "$SUPER_SPARSE" "$WORKSPACE/lp"
+else
+    echo "❌ Neither lpunpack binary nor lpunpack.py found!"
+    exit 1
+fi
+
+echo ""
+echo "📊 Partitions found in super:"
+ls -la "$WORKSPACE/lp/"
+
+# ── Extract EROFS partitions ─────────────────────────────────────────
+FSCK="$ROOT_DIR/tools/fsck.erofs"
+[[ -x "$FSCK" ]] || FSCK="$(which fsck.erofs 2>/dev/null || true)"
+if [[ -z "$FSCK" ]]; then
+    echo "❌ fsck.erofs not found!"
+    exit 1
+fi
+
+extract_erofs() {
+    local part="$1"
+    local outdir="$ROOT_DIR/mnt/$part"
+    mkdir -p "$outdir"
+
+    local img="$WORKSPACE/lp/${part}.img"
+    [[ -f "$img" ]] || img="$WORKSPACE/lp/${part}_a.img"
+
+    if [[ ! -f "$img" ]]; then
+        echo "  ⏭  $part: not in super, skipping"
+        return 0
+    fi
+    echo "  📂 $part → $outdir"
+    "$FSCK" --extract="$outdir" "$img" || echo "  ⚠️  $part extraction warnings (may be OK)"
+}
+
+EXTRACTED_PARTS=()
+for part in system vendor product odm system_ext vendor_dlkm odm_dlkm; do
+    extract_erofs "$part"
+    if [[ -n "$(ls -A "$ROOT_DIR/mnt/$part" 2>/dev/null)" ]]; then
+        EXTRACTED_PARTS+=("$part")
+    fi
+done
+
+printf '%s\n' "${EXTRACTED_PARTS[@]}" > "$WORKSPACE/partition_list.txt"
+echo ""
+echo "✅ Extracted: ${EXTRACTED_PARTS[*]}"
+echo "✅ Firmware unpack complete."
