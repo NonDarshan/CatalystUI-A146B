@@ -33,7 +33,7 @@ which fsck.erofs>/dev/null 2>&1 && ln -sf "$(which fsck.erofs)" tools/fsck.erofs
 
 echo "📥 Installing Python samloader (replaces slow cargo/samloader-rs)..."
 python3 -m pip install --quiet --upgrade pip 2>/dev/null || true
-python3 -m pip install --quiet samloader
+python3 -m pip install --quiet git+https://github.com/nlscc/samloader.git
 
 # Helper: download a binary and verify it is actually an ELF, not an HTML 404 page
 download_binary() {
