@@ -17,10 +17,14 @@ echo "📥 Compiling Rust samloader (TopJohnWu's maintained version)..."
 cargo install samloader
 
 echo "📥 Downloading LP partition tools (lpmake, lpdump)..."
-# Fix: LineageOS moved these to the lineage-21.0 branch
-LINEAGE_21="https://raw.githubusercontent.com/LineageOS/android_prebuilts_tools-lineage/lineage-21.0/linux-x86/bin"
-wget -q "$LINEAGE_21/lpmake" -O tools/lpmake || echo "  ❌ lpmake failed"
-wget -q "$LINEAGE_21/lpdump" -O tools/lpdump || echo "  ❌ lpdump failed"
+
+# Mirror 1 (Primary): OtakuKitchen repo
+wget -q "https://raw.githubusercontent.com/1-100/OtakuKitchen/main/tools/linux/x86/lpmake" -O tools/lpmake || \
+# Mirror 2 (Fallback): LonelyFool static builds
+wget -q "https://raw.githubusercontent.com/LonelyFool/lpmake_static/main/lpmake" -O tools/lpmake || \
+echo "❌ lpmake failed on all mirrors"
+
+wget -q "https://raw.githubusercontent.com/1-100/OtakuKitchen/main/tools/linux/x86/lpdump" -O tools/lpdump || true
 
 echo "📥 Downloading Python lpunpack..."
 wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack.py" -O tools/lpunpack.py || echo "  ❌ lpunpack.py failed"
