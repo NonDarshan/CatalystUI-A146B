@@ -15,16 +15,19 @@ sudo apt-get install -y lz4 android-sdk-libsparse-utils xz-utils unzip wget curl
 echo "📥 Compiling Rust samloader (TopJohnWu's maintained version)..."
 # We are returning to the Rust version! It is 100% immune to Samsung FOTA blocks.
 cargo install samloader
+echo "📥 Downloading LP partition tools (lpmake)..."
 
-echo "📥 Downloading LP partition tools (lpmake, lpdump)..."
+# The Ultimate lpmake Hunter (Tries crDroid, LineageOS 20, and PixelExperience)
+CRDROID="https://raw.githubusercontent.com/crdroidandroid/android_prebuilts_tools-lineage/14.0/linux-x86/bin/lpmake"
+LINEAGE="https://raw.githubusercontent.com/LineageOS/android_prebuilts_tools-lineage/lineage-20.0/linux-x86/bin/lpmake"
+PIXEL="https://raw.githubusercontent.com/PixelExperience/prebuilts_tools-lineage/thirteen/linux-x86/bin/lpmake"
 
-# Mirror 1 (Primary): OtakuKitchen repo
-wget -q "https://raw.githubusercontent.com/1-100/OtakuKitchen/main/tools/linux/x86/lpmake" -O tools/lpmake || \
-# Mirror 2 (Fallback): LonelyFool static builds
-wget -q "https://raw.githubusercontent.com/LonelyFool/lpmake_static/main/lpmake" -O tools/lpmake || \
-echo "❌ lpmake failed on all mirrors"
+wget -q "$CRDROID" -O tools/lpmake || \
+wget -q "$LINEAGE" -O tools/lpmake || \
+wget -q "$PIXEL" -O tools/lpmake || \
+echo "❌ lpmake failed on all major ROM repositories!"
 
-wget -q "https://raw.githubusercontent.com/1-100/OtakuKitchen/main/tools/linux/x86/lpdump" -O tools/lpdump || true
+chmod +x tools/lpmake 2>/dev/null || true
 
 echo "📥 Downloading Python lpunpack..."
 wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack.py" -O tools/lpunpack.py || echo "  ❌ lpunpack.py failed"
