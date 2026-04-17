@@ -158,45 +158,36 @@ for extra in vbmeta_system vbmeta_vendor; do
     fi
 done
 
-# ── Create Odin AP tar.md5 ───────────────────────────────────────────
-# BUG FIX: old output was `zip -r` of raw images — Odin cannot flash
-# that. Odin requires a tar containing lz4-compressed images, with an
-# md5 hash appended to the end of the tar (Samsung's format).
+# ── Create TWRP Flashable ZIP ─────────────────────────────────────────
 echo ""
-echo "📦 Creating Odin-flashable AP tar.md5..."
+echo "📦 Preparing TWRP-flashable ZIP..."
 
 cd "$WORK"
 
-LZ4_FILES=()
-for img_file in *.img; do
-    [[ -f "$img_file" ]] || continue
-    echo "  🗜️  Compressing $img_file..."
-    lz4 -B6 --content-size "$img_file" "${img_file}.lz4" \
-        && LZ4_FILES+=("${img_file}.lz4") \
-        || echo "  ⚠️  Compression failed for $img_file"
-done
-
-if [[ ${#LZ4_FILES[@]} -eq 0 ]]; then
-    echo "❌ No images to package — build failed upstream."
-    exit 1
+# 1. Bring in the META-INF folder from your repo
+if [[ -d "$ROOT_DIR/META-INF" ]]; then
+    echo "  🗂️ Injecting META-INF installer..."
+    cp -r "$ROOT_DIR/META-INF" "$WORK/"
+else
+    echo "  ❌ WARNING: META-INF folder not found in repo root!"
+    echo "     This ZIP will just contain images and won't flash in TWRP."
 fi
 
-ODIN_TAR="$OUTDIR/AP_CatalystUI_A146B.tar"
-echo "  📼 Packaging: ${LZ4_FILES[*]}"
-tar -H ustar -c "${LZ4_FILES[@]}" > "$ODIN_TAR"
+RELEASE_ZIP="$OUTDIR/CatalystUI_A146B_Release.zip"
+echo "  📼 Zipping everything together (compression level 1 for speed)..."
 
-# Append md5 in Samsung Odin format (text line at end of tar binary)
-md5sum "$ODIN_TAR" >> "$ODIN_TAR"
-mv "$ODIN_TAR" "${ODIN_TAR}.md5"
+# 2. We use -1 (fast compression) because .img files are already compressed 
+# and we don't want GitHub to hang for 20 minutes trying to compress 6GB.
+zip -r -1 "$RELEASE_ZIP" ./* > /dev/null
 
-SIZE=$(du -sh "${ODIN_TAR}.md5" | cut -f1)
+SIZE=$(du -sh "$RELEASE_ZIP" | cut -f1)
 echo ""
-echo "✅ Output: AP_CatalystUI_A146B.tar.md5 ($SIZE)"
+echo "✅ Output: CatalystUI_A146B_Release.zip ($SIZE)"
 echo ""
 echo "  ╔═══════════════════════════════════════════════╗"
-echo "  ║  Flash instructions (OEM unlock required):    ║"
-echo "  ║  1. Odin3 v3.14.4 on Windows PC               ║"
-echo "  ║  2. AP → select AP_CatalystUI_A146B.tar.md5   ║"
-echo "  ║  3. Options: Auto Reboot ✓  F. Reset Time ✓   ║"
-echo "  ║  4. Phone in Download Mode → START            ║"
+echo "  ║  TWRP Flash Instructions:                     ║"
+echo "  ║  1. Boot to TWRP                              ║"
+echo "  ║  2. Wipe -> Format Data -> 'yes'              ║"
+echo "  ║  3. Install -> CatalystUI_A146B_Release.zip   ║"
+echo "  ║  4. Reboot System                             ║"
 echo "  ╚═══════════════════════════════════════════════╝"
