@@ -54,12 +54,14 @@ if [[ ! -f "$CSC" ]]; then
 EOF
 fi
 
-echo "📲 Appending CSC premium features (call recording, camera toggles)..."
+echo "📲 Appending CSC premium features (call recording, camera toggles, 5G Force)..."
 cat >> "$CSC" <<'EOF'
 
 <CscFeature_VoiceCall_ConfigRecording>RecordingAllowed</CscFeature_VoiceCall_ConfigRecording>
 <CscFeature_Camera_ShutterSoundMenu>TRUE</CscFeature_Camera_ShutterSoundMenu>
 <CscFeature_Message_EnableSaveRestore>TRUE</CscFeature_Message_EnableSaveRestore>
+<CscFeature_Setting_SupportReal5G>TRUE</CscFeature_Setting_SupportReal5G>
+<CscFeature_RIL_ConfigNetworkMode>5G_ONLY</CscFeature_RIL_ConfigNetworkMode>
 EOF
 
 echo "✅ Catalyst feature injection completed."
