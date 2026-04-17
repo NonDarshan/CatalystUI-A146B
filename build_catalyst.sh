@@ -1,28 +1,32 @@
 #!/usr/bin/env bash
 set -e
 
-# Get the absolute path of where this script is located
 export ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 echo "🚀 Starting Catalyst UI Build Process..."
-
-# Force permissions again just to be safe
 chmod -R +x scripts/
 
-echo "🧰 [1/5] Installing Tools..."
-./scripts/1_download_tools.sh
+run_step() {
+    local num="$1" label="$2" script="$3"
+    echo ""
+    echo "══════════════════════════════════════════"
+    echo "  STEP $num: $label"
+    echo "══════════════════════════════════════════"
+    if ! "$script"; then
+        echo ""
+        echo "❌ Build FAILED at step $num: $label"
+        exit 1
+    fi
+}
 
-echo "📡 [2/5] Fetching and Unpacking Firmware..."
-./scripts/2_unpack_firmware.sh
+run_step 1 "Installing Tools"              ./scripts/1_download_tools.sh
+run_step 2 "Fetching and Unpacking Firmware" ./scripts/2_unpack_firmware.sh
+run_step 3 "Debloating and De-Knox"        ./scripts/3_debloat_and_deknox.sh
+run_step 4 "Injecting Catalyst Features"  ./scripts/4_catalyst_features.sh
+run_step 5 "Repacking Catalyst UI"        ./scripts/5_repack_catalyst.sh
 
-echo "🧹 [3/5] Debloating and De-Knox..."
-./scripts/3_debloat_and_deknox.sh
-
-echo "✨ [4/5] Injecting Catalyst Optimizations..."
-./scripts/4_catalyst_features.sh
-
-echo "🏗️ [5/5] Repacking Catalyst UI..."
-./scripts/5_repack_catalyst.sh
-
+echo ""
 echo "🎉 Catalyst UI Build Complete!"
+echo "   Output: out/AP_CatalystUI_A146B.tar.md5"
+echo "   Flash : Odin3 → AP slot → Start"
