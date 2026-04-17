@@ -1,0 +1,42 @@
+#MAGISK
+setdefault   import_addons        on
+setdefault   extraction_speed     default
+
+#ReCoreUI script starts here:
+ui_print " "
+ui_print "Welcome to ReCoreUI Installer!"
+ui_print " "
+ui_print "ReCoreUI  8.1.Ultra  for Galaxy A14 5G  "
+ui_print " "
+ui_print "ReCoreUI is coded by @KrrishJaat "
+ui_print " "
+ui_print "Build: 20260406"
+
+# Install
+   ui_print "Installing ROM.... .It will take some time."
+   ui_print "Do not cancel or force reboot until installation is complete."
+
+   update_zip super.img $(find_block super)
+
+
+ui_print "Installing Kernel...";
+update_zip boot.img $(find_block boot);
+update_zip vendor_boot.img $(find_block vendor_boot);
+update_zip vbmeta.img $(find_block vbmeta);
+update_zip dtbo.img $(find_block dtbo);
+ui_print "Installing Optics...";
+update_zip optics.img $(find_block optics);
+ui_print "Installing Prism...";
+update_zip prism.img $(find_block prism);
+
+   ui_print "ReCoreUI successfully installed."
+
+
+# Ending
+   ui_print " If you want to reboot to recovery, press vol + "
+   ui_print " If you want to close the installer, press vol - "
+   if $yes; then
+      run_program "$addons/reboot" recovery
+   else
+      end "Installer closed... "
+   fi
