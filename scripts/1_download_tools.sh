@@ -8,26 +8,29 @@ mkdir -p tools workspace out mnt/system mnt/vendor mnt/product mnt/odm mnt/syste
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "📥 Installing system packages..."
+echo "📥 Installing system packages and C++ compilers..."
 sudo apt-get update -q
-sudo apt-get install -y lz4 android-sdk-libsparse-utils xz-utils unzip wget curl python3 python3-pip erofs-utils zip tar xxd
+sudo apt-get install -y lz4 android-sdk-libsparse-utils xz-utils unzip wget curl python3 python3-pip erofs-utils zip tar xxd build-essential cmake zlib1g-dev liblzma-dev
 
 echo "📥 Compiling Rust samloader (TopJohnWu's maintained version)..."
-# We are returning to the Rust version! It is 100% immune to Samsung FOTA blocks.
 cargo install samloader
-echo "📥 Downloading LP partition tools (lpmake)..."
 
-echo "📥 Downloading LP partition tools (lpmake, lpdump)..."
+echo "📥 Compiling LP tools natively from the thka2016 repository (Zero 404 Guarantee)..."
+cd "$ROOT_DIR/workspace"
+# Clone the exact repository you found
+git clone https://github.com/thka2016/lpunpack_and_lpmake_cmake.git
+cd lpunpack_and_lpmake_cmake
 
-# Source 1: Permanent GitHub Release Asset (Will not 404)
-wget -q "https://github.com/thka2016/lpunpack_and_lpmake_cmake/releases/download/cmake/lpmake" -O tools/lpmake || \
-# Source 2: Dedicated static binary mirror
-wget -q "https://raw.githubusercontent.com/whyshhnuv/lpunpack-lpmake-mirror/master/binary/lpmake" -O tools/lpmake || \
-echo "❌ lpmake failed"
+# Compile the source code into native Linux binaries
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
 
-wget -q "https://github.com/thka2016/lpunpack_and_lpmake_cmake/releases/download/cmake/lpdump" -O tools/lpdump || \
-echo "⚠️ lpdump failed (Non-critical, script will use raw stat size instead)"
+# Copy the freshly compiled binaries into our tools folder
+cp lpmake "$ROOT_DIR/tools/lpmake" || echo "❌ lpmake compilation failed"
+cp lpdump "$ROOT_DIR/tools/lpdump" || true
 
+cd "$ROOT_DIR"
 chmod +x tools/lpmake tools/lpdump 2>/dev/null || true
 
 echo "📥 Downloading Python lpunpack..."
@@ -35,6 +38,10 @@ wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack
 
 echo "📥 Downloading avbtool.py (for vbmeta patching — CRITICAL)..."
 wget -q "https://raw.githubusercontent.com/LineageOS/android_external_avb/lineage-21.0/avbtool.py" -O tools/avbtool.py || echo "  ❌ avbtool.py failed"
+
+chmod +x tools/* 2>/dev/null || true
+
+echo "✅ Tool setup complete."wget -q "https://raw.githubusercontent.com/LineageOS/android_external_avb/lineage-21.0/avbtool.py" -O tools/avbtool.py || echo "  ❌ avbtool.py failed"
 
 chmod +x tools/* 2>/dev/null || true
 
