@@ -47,12 +47,19 @@ fi
 AP_TAR="${ap_files[0]}"
 echo "✅ AP file: $(basename "$AP_TAR")"
 
-echo "🔨 Extracting super.img.lz4 from AP tar..."
-tar -xf "$AP_TAR" -C "$WORKSPACE" super.img.lz4 || {
-    echo "❌ super.img.lz4 not in AP tar. Listing contents:"
-    tar -tf "$AP_TAR" | head -30
+echo "🔨 Extracting critical images from AP tar..."
+tar -xf "$AP_TAR" -C "$WORKSPACE" super.img.lz4 boot.img.lz4 vbmeta.img.lz4 || {
+    echo "❌ Core images missing from AP tar!"
     exit 1
 }
+
+echo "🔨 Extracting hardware images from BL tar..."
+shopt -s nullglob
+bl_files=("$EXTRACTED"/BL_*.tar.md5 "$EXTRACTED"/BL_*.tar)
+shopt -u nullglob
+if [[ ${#bl_files[@]} -gt 0 ]]; then
+    tar -xf "${bl_files[0]}" -C "$WORKSPACE" dtbo.img.lz4 vendor_boot.img.lz4 prism.img.lz4 optics.img.lz4 || echo "⚠️ Some BL images missing (this is usually fine)"
+fi
 
 echo "🧹 Freeing space (removing raw firmware download)..."
 rm -f "$FIRMWARE_ZIP" || true
