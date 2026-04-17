@@ -32,9 +32,9 @@ jobs:
           chmod +x build_catalyst.sh
           ./build_catalyst.sh
 
-      - name: Upload AP artifact
+      - name: Upload TWRP ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: CatalystUI_A146B_Release
-          path: out/*.tar.md5
+          path: out/*.zip
           if-no-files-found: error
