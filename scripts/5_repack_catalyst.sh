@@ -89,11 +89,11 @@ else
         )
     done
 
-    if "$LPMAKE" "${LPMAKE_ARGS[@]}"; then
+    if "$LPMAKE" "${LPMAKE_ARGS[@]}" && [[ -f "$SUPER_OUT" ]]; then
         echo "  ✅ super.img built ($(du -sh "$SUPER_OUT" | cut -f1))"
         for part in "${BUILT_PARTS[@]}"; do rm -f "$WORK/${part}.img"; done
     else
-        echo "  ❌ lpmake failed! Keeping individual partition images."
+        echo "  ❌ lpmake failed or file missing! Keeping individual partition images."
         rm -f "$SUPER_OUT"
     fi
 fi
