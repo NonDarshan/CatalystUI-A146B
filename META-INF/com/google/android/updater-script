@@ -3,14 +3,12 @@ setdefault   import_addons        on
 setdefault   extraction_speed     default
 
 #ReCoreUI script starts here:
-ui_print " "
-ui_print "Welcome to ReCoreUI Installer!"
-ui_print " "
-ui_print "ReCoreUI  8.1.Ultra  for Galaxy A14 5G  "
-ui_print " "
-ui_print "ReCoreUI is coded by @KrrishJaat "
-ui_print " "
-ui_print "Build: 20260406"
+ui_print(" ")
+ui_print("=========================");
+ui_print("  Installing Catalyst UI ");
+ui_print("       by Darshan        ");
+ui_print("=========================");
+ui_print(" ")
 
 # Install
    ui_print "Installing ROM.... .It will take some time."
