@@ -17,17 +17,18 @@ echo "📥 Compiling Rust samloader (TopJohnWu's maintained version)..."
 cargo install samloader
 echo "📥 Downloading LP partition tools (lpmake)..."
 
-# The Ultimate lpmake Hunter (Tries crDroid, LineageOS 20, and PixelExperience)
-CRDROID="https://raw.githubusercontent.com/crdroidandroid/android_prebuilts_tools-lineage/14.0/linux-x86/bin/lpmake"
-LINEAGE="https://raw.githubusercontent.com/LineageOS/android_prebuilts_tools-lineage/lineage-20.0/linux-x86/bin/lpmake"
-PIXEL="https://raw.githubusercontent.com/PixelExperience/prebuilts_tools-lineage/thirteen/linux-x86/bin/lpmake"
+echo "📥 Downloading LP partition tools (lpmake, lpdump)..."
 
-wget -q "$CRDROID" -O tools/lpmake || \
-wget -q "$LINEAGE" -O tools/lpmake || \
-wget -q "$PIXEL" -O tools/lpmake || \
-echo "❌ lpmake failed on all major ROM repositories!"
+# Source 1: Permanent GitHub Release Asset (Will not 404)
+wget -q "https://github.com/thka2016/lpunpack_and_lpmake_cmake/releases/download/cmake/lpmake" -O tools/lpmake || \
+# Source 2: Dedicated static binary mirror
+wget -q "https://raw.githubusercontent.com/whyshhnuv/lpunpack-lpmake-mirror/master/binary/lpmake" -O tools/lpmake || \
+echo "❌ lpmake failed"
 
-chmod +x tools/lpmake 2>/dev/null || true
+wget -q "https://github.com/thka2016/lpunpack_and_lpmake_cmake/releases/download/cmake/lpdump" -O tools/lpdump || \
+echo "⚠️ lpdump failed (Non-critical, script will use raw stat size instead)"
+
+chmod +x tools/lpmake tools/lpdump 2>/dev/null || true
 
 echo "📥 Downloading Python lpunpack..."
 wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack.py" -O tools/lpunpack.py || echo "  ❌ lpunpack.py failed"
