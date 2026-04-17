@@ -52,27 +52,30 @@ download_binary() {
 }
 
 echo "📥 Downloading LP partition tools (lpmake, lpdump)..."
-LINEAGE="https://github.com/LineageOS/android_prebuilts_tools-lineage/raw/master/linux-x86/bin"
-LINEAGE_21="https://github.com/LineageOS/android_prebuilts_tools-lineage/raw/lineage-21/linux-x86/bin"
+# Using a stable OtakuKitchen tools repository
+TOOLS_REPO="https://github.com/1-100/OtakuKitchen/raw/main/tools/linux/x86"
 
-download_binary "$LINEAGE/lpmake"  tools/lpmake  || \
-download_binary "$LINEAGE_21/lpmake" tools/lpmake || \
-echo "  ❌ lpmake unavailable — will skip super.img build"
-
-download_binary "$LINEAGE/lpdump"  tools/lpdump  || \
-download_binary "$LINEAGE_21/lpdump" tools/lpdump || \
-echo "  ℹ️  lpdump unavailable — super size will be read from raw image stat"
+download_binary "$TOOLS_REPO/lpmake"  tools/lpmake  || echo "  ❌ lpmake unavailable"
+download_binary "$TOOLS_REPO/lpdump"  tools/lpdump  || echo "  ℹ️  lpdump unavailable"
 
 echo "📥 Downloading Python lpunpack..."
 wget -q "https://raw.githubusercontent.com/unix3dgforce/lpunpack/master/lpunpack.py" \
     -O tools/lpunpack.py && echo "  ✅ lpunpack.py" || echo "  ❌ lpunpack.py failed"
 
 echo "📥 Downloading avbtool.py (for vbmeta patching — CRITICAL)..."
+# Pulling the official Android Open Source Project avbtool directly from Google
 wget -q --timeout=30 \
-    "https://raw.githubusercontent.com/LineageOS/android_external_avb/lineage-21/avbtool.py" \
-    -O tools/avbtool.py \
-  && echo "  ✅ avbtool.py" \
-  || echo "  ❌ avbtool.py MISSING — modified ROM will NOT boot without vbmeta patching!"
+    "https://android.googlesource.com/platform/external/avb/+/refs/heads/master/avbtool.py?format=TEXT" \
+    -O tools/avbtool_base64.txt
+# Google Source serves text files as base64, so we decode it:
+base64 -d tools/avbtool_base64.txt > tools/avbtool.py 2>/dev/null || true
+rm -f tools/avbtool_base64.txt
+
+if [[ -s tools/avbtool.py ]]; then
+    echo "  ✅ avbtool.py"
+else
+    echo "  ❌ avbtool.py MISSING — modified ROM will NOT boot without vbmeta patching!"
+fi
 
 chmod +x tools/* 2>/dev/null || true
 
